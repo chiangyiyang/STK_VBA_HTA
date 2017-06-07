@@ -1,0 +1,104 @@
+<HTML>
+<HEAD>
+<HTA:APPLICATION ID="20170607 STK VBA Training" 
+   BORDER="thick" 
+   BORDERSTYLE="complex"/>
+
+<TITLE>20170607 STK VBA Training</TITLE>
+</HEAD>
+<BODY>
+
+    
+<script language="VBScript">
+
+    dim app
+    dim root 
+    dim Scenario
+
+    sub LaunchSTK()
+        Set app = CreateObject("STK.Application")
+        'Set app = GetObject("", "STK.Application")
+        app.Visible = True
+        Set root = app.Personality2
+    end sub
+
+    sub NewScenario()
+        root.NewScenario ("VitualT")
+        Set Scenario = root.CurrentScenario
+        notUsed = Scenario.SetTimePeriod("Today", "+24hr")
+        notUsed = root.Rewind()
+    end sub
+
+    function getRndNum(min, max)
+        getRndNum = rnd(now()) * (max - min) + min
+    end function
+
+    sub LoadTargets()
+        dim str
+        str = ""
+        for i = 1 to 10
+            Dim target
+            Set target = root.CurrentScenario.Children.New(23, "T" + CStr(i))
+            notUsed = target.Position.AssignGeodetic(getRndNum(-80, 80), getRndNum(-180, 180), 0)
+        next 
+           
+    end sub
+
+    sub InsertSatellite()
+        root.ExecuteCommand ("New / */Satellite ERS1")
+        root.ExecuteCommand ("SetState */Satellite/ERS1 Classical TwoBody UseScenarioInterval 60 ICRF ""UseAnalysisStartTime"" 7200000.0 0.0 90.0 0.0 0.0 0.0")
+        root.ExecuteCommand ("Propagate */Satellite/ERS1")
+    end sub
+
+    sub ComputeAccessAndDisplayResult()
+        Dim sat
+        Set sat = root.GetObjectFromPath("Satellite/ERS1")
+        Dim tar
+        Set tar = root.GetObjectFromPath("Target/T1")
+        Dim access
+        Set access = sat.GetAccessToObject(tar)
+        notUsed = access.ComputeAccess()
+
+        Dim dp
+        Set dp = access.DataProviders("Access Data")
+        Dim results
+        Set results = dp.Exec(Scenario.StartTime, Scenario.StopTime)
+        accessNumber = results.DataSets(0).GetValues()
+        accessStart = results.DataSets(1).GetValues()
+        accessStop = results.DataSets(2).GetValues()
+        accessDuration = results.DataSets(3).GetValues()
+
+        dim output
+        
+        output = "<table>"
+        output = output + "<tr><th>" + results.DataSets(0).ElementName _
+                + "</th><th>" + results.DataSets(1).ElementName _
+                + "</th><th>" + results.DataSets(2).ElementName _
+                + "</th><th>" + results.DataSets(3).ElementName + "</th></tr>"
+
+        For i = 0 To UBound(accessNumber)
+
+            output = output + "<tr><td>" + CStr(accessNumber(i)) _
+                + "</td><td>" + CStr(accessStart(i)) _
+                + "</td><td>" + CStr(accessStop(i)) _
+                + "</td><td>" + CStr(accessDuration(i)) + "</td></tr>"
+        Next
+
+'        ActiveSheet.Columns("K").Select
+'        Selection.NumberFormat = "dd mmm yyyy hh:mm:ss.000"
+'        ActiveSheet.Columns("L").Select
+'        Selection.NumberFormat = "dd mmm yyyy hh:mm:ss.000"
+        document.getElementById("output").innerHTML = output + "</table>"
+    end sub
+
+
+</script>
+<input type="button" value="LaunchSTK" onclick="LaunchSTK()"/>
+<input type="button" value="NewScenario" onclick="NewScenario()"/>
+<input type="button" value="LoadTargets" onclick="LoadTargets()"/>
+<input type="button" value="InsertSatellite" onclick="InsertSatellite()"/>
+<input type="button" value="Compute access and display result" onclick="ComputeAccessAndDisplayResult()"/>
+
+ <p id="output"></p>
+</BODY>
+</HTML>
